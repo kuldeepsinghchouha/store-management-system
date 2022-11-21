@@ -1,11 +1,12 @@
 from tkinter import*
 from PIL import Image,ImageTk
-from tkinter import ttk
+from tkinter import ttk,messagebox
+import sqlite3
 class employeeClass:
     def __init__(self,root):
         self.root=root
         self.root.geometry("1100x500+220+130")
-        
+        #self.root.resizable(False,FALSE)
         #variables
         self.var_searchby=StringVar()
         self.var_searchtxt=StringVar()
@@ -18,7 +19,9 @@ class employeeClass:
         self.var_email=StringVar()
         self.var_pass=StringVar()
         self.var_utype=StringVar()
+        self.txt_address=StringVar()
         self.var_salary=StringVar()
+        self.var_update=StringVar()
         
         
         
@@ -65,7 +68,7 @@ class employeeClass:
         lbl_pass=Label(self.root,text="Password",font=("goudy old style",15),bg="white").place(x=350,y=230)
         lbl_utype=Label(self.root,text="User Type",font=("goudy old style",15),bg="white").place(x=750,y=230)
        
-        txt_email=Entry(self.root,textvariable=self.var_name,font=("goudy old style",15),bg="light yellow").place(x=150,y=230,width=180)
+        txt_email=Entry(self.root,textvariable=self.var_email,font=("goudy old style",15),bg="light yellow").place(x=150,y=230,width=180)
         txt_pass=Entry(self.root,textvariable=self.var_pass,font=("goudy old style",15),bg="light yellow").place(x=500,y=230,width=180)
         txt_utype=Entry(self.root,textvariable=self.var_utype,font=("goudy old style",15),bg="light yellow").place(x=850,y=230,width=180)
         
@@ -74,15 +77,163 @@ class employeeClass:
         cmb_utype.current(0)
         
        ##Row4=============
-        lbl_email=Label(self.root,text="Address",font=("goudy old style",15),bg="white").place(x=50,y=270)
-        lbl_salary=Label(self.root,text="Salary",font=("goudy old style",15),bg="white").place(x=350,y=270)
+        lbl_address=Label(self.root,text="Address",font=("goudy old style",15),bg="white").place(x=50,y=270)
+        lbl_salary=Label(self.root,text="Salary",font=("goudy old style",15),bg="white").place(x=500,y=270)
        
-        self.txt_address=Text(self.root,font=("goudy old style",15),bg="light yellow").place(x=150,y=270,width=180)
-        txt_salary=Entry(self.root,textvariable=self.var_salary,font=("goudy old style",15),bg="light yellow").place(x=150,y=270,width=180)
+        self.txt_address=Text(self.root,font=("goudy old style",15),bg="light yellow")
+        self.txt_address.place(x=150,y=270,width=300,height=60)
+        txt_salary=Entry(self.root,textvariable=self.var_salary,font=("goudy old style",15),bg="light yellow").place(x=600,y=270,width=180)
       
+        #Button=======================================================
+        btn_add=Button(self.root,text="Save",command=self.add,font=("goudy old style",15),bg="#2196f3",fg="white",cursor="hand2").place(x=500,y=305,width=110,height=28)
+        btn_update=Button(self.root,text="Update",command=self.update,font=("goudy old style",15),bg="#4caf50",fg="white",cursor="hand2").place(x=620,y=305,width=110,height=28)
+        btn_delete=Button(self.root,text="Delete",font=("goudy old style",15),bg="#f44336",fg="white",cursor="hand2").place(x=740,y=305,width=110,height=28)
+        btn_clear=Button(self.root,text="Clear",font=("goudy old style",15),bg="#607d8b",fg="white",cursor="hand2").place(x=860,y=305,width=110,height=28)
         
+##########################employeeee
+        emp_frame=Frame(self.root,bd=3,relief=RIDGE)
+        emp_frame.place(x=0,y=350,relwidth=1,height=150)
+        
+        scrolly=Scrollbar(emp_frame,orient=VERTICAL)
+        scrollx=Scrollbar(emp_frame,orient=HORIZONTAL)
+        
+        
+        self.EmployeeTable=ttk.Treeview(emp_frame,columns=("eid","name","email","gender","contact","dob","doj","pass","utype","address","salary"),yscrollcommand=scrolly.set,xscrollcommand=scrollx.set)
+        scrollx.pack(side=BOTTOM,fill="x")
+        scrolly.pack(side=RIGHT,fill="y")
+        scrollx.config(command=self.EmployeeTable.xview)
+        scrolly.config(command=self.EmployeeTable.yview)
+        
+        
+        self.EmployeeTable.heading("eid",text="EMP ID")
+        self.EmployeeTable.heading("name",text="Name")
+        self.EmployeeTable.heading("email",text="Email")
+        self.EmployeeTable.heading("gender",text="Gender")
+        self.EmployeeTable.heading("contact",text="Contact")
+        self.EmployeeTable.heading("dob",text="D.O.B")
+        self.EmployeeTable.heading("doj",text="D.O.J")
+        self.EmployeeTable.heading("pass",text="Password")
+        self.EmployeeTable.heading("utype",text="User Type")
+        self.EmployeeTable.heading("address",text="Address")
+        self.EmployeeTable.heading("salary",text="Salary")
+        self.EmployeeTable["show"]="headings"
+        
+        
+        self.EmployeeTable.column("eid",width=90)
+        self.EmployeeTable.column("name",width=100)
+        self.EmployeeTable.column("email",width=100)
+        self.EmployeeTable.column("gender",width=100)
+        self.EmployeeTable.column("contact",width=100)
+        self.EmployeeTable.column("dob",width=100)
+        self.EmployeeTable.column("doj",width=100)
+        self.EmployeeTable.column("pass",width=100)
+        self.EmployeeTable.column("utype",width=100)
+        self.EmployeeTable.column("address",width=100)
+        self.EmployeeTable.column("salary",width=100)
+        self.EmployeeTable.pack(fill=BOTH,expand=1)
+        self.EmployeeTable.bind("<ButtonRelease-1>",self.get_data)
+    
+        self.show()
+##################################################
+    def add(self):
+        con=sqlite3.connect(database=r'sms.db')
+        cur=con.cursor()
+        try:
+            if self.var_emp_id.get()=="":
+                messagebox.showerror("Error","Employee ID Must be required",parent=self.root)
+            else:
+                cur.execute("Select * from employee where eid=?",(self.var_emp_id.get(),))
+                row=cur.fetchone()
+                if row!=None:
+                    messagebox.showerror("Error","This Employee ID already assigned,try different",parent=self.root)
+                else:
+                     cur.execute("Insert into employee (eid,name,email,gender,contact,dob,doj,pass,utype,address,salary) values(?,?,?,?,?,?,?,?,?,?,?)",(
+                                               self.var_emp_id.get(),
+                                               self.var_name.get(),
+                                               self.var_email.get(),
+                                               self.var_gender.get(),
+                                               self.var_contact.get(),
+                                               self.var_dob.get(),
+                                               self.var_doj.get(),                           
+                                               self.var_pass.get(),
+                                               self.var_utype.get(),
+                                               self.txt_address.get('1.0',END),
+                                               self.var_salary.get(),
+                        
+                    ))
+                     con.commit()
+                     messagebox.showinfo("success","Employee Added successfully",parent=self.root)
+                     self.show()       
+        
+        except Exception as ex:
+            messagebox.showerror("Error",f"Error due to : {str(ex)}",parent=self.root)
+     
 
-        
+    def show(self):
+        con=sqlite3.connect(database=r'sms.db')
+        cur=con.cursor()
+        try:
+            cur.execute("select * from employee")
+            rows=cur.fetchall()
+            self.EmployeeTable.delete(*self.EmployeeTable.get_children())
+            for row in rows:
+                self.EmployeeTable.insert('',END,values=row)
+        except Exception as ex:
+            messagebox.showerror("Error",f"Error due to :{str(ex)}",parent=self.root)
+     
+    def get_data(self,ev):
+         f=self.EmployeeTable.focus()
+         content=(self.EmployeeTable.item(f))
+         row=content['values']
+         #print(row)
+         self.var_emp_id.set(row[0])
+         self.var_name.set(row[1])
+         self.var_email.set(row[2])
+         self.var_gender.set(row[3])
+         self.var_contact.set(row[4])
+         self.var_dob.set(row[5])
+         self.var_doj.set(row[6])                           
+         self.var_pass.set(row[7])
+         self.var_utype.set(row[8])
+         self.txt_address.delete('1.0',END)
+         self.txt_address.insert(END,row[9])
+         self.txt_address.set(row[9])
+         self.var_salary.set(row[10])
+         
+         
+    def update(self):
+        con=sqlite3.connect(database=r'sms.db')
+        cur=con.cursor()
+        try:
+           if self.var_emp_id.get()=="":
+               messagebox.showerror("Error","Employee ID Must be required",parent=self.root)
+           else:
+               cur.execute("Select * from employee where eid=?",(self.var_emp_id.get(),))
+               row=cur.fetchone()
+               if row==None:
+                   
+                   messagebox.showerror("Error","Invalid Employee ID",parent=self.root)
+               else:
+                   
+                   cur.execute("Update employee set name=?,email=?,gender=?,contact=?,dob=?,doj=?,pass=?,utype=?,address=?,salary=?) where eid=?",(
+                   self.var_name.get(),
+                   self.var_email.get(),
+                   self.var_gender.get(),
+                   self.var_contact.get(),
+                   self.var_dob.get(),
+                   self.var_doj.get(),                           
+                   self.var_pass.get(),
+                   self.var_utype.get(),
+                   self.txt_address.get('1.0',END),
+                   self.var_salary.get(),
+                   self.var_emp_id.get(),
+                   ))
+                   con.commit()
+                   messagebox.showinfo("success","Employee Updated successfully",parent=self.root)
+                   self.show()                                   
+        except Exception as ex:
+         messagebox.showerror("Error",f"Error due to :{str(ex)}",parent=self.root)
+         
 if __name__=="__main__":
     root=Tk()
     obj=employeeClass(root)
